@@ -1,1 +1,366 @@
+%matplotlib inline
+import numpy as np
+import warnings
+warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
+from gensim.models import KeyedVectors                                                  
+import random
+import re
+import matplotlib.pyplot as plt                                  
+from sklearn.model_selection import train_test_split
+import os
+import jieba
+import jieba.analyse
+import jieba.posseg as psg
+from collections import Counter
 
+cn_model = KeyedVectors.load_word2vec_format(
+    'E:/Chinese-Word-Vectors-master/sgns.renmin.bigram-char', 
+    binary = False)         #基于《人民日报》的word2vector
+
+#加载训练样本
+fp = open ('d:/pos1.txt','r' , encoding = 'utf-8')
+fn = open ('d:/neg1.txt','r' , encoding = 'utf-8')
+train_txt_orig = []
+neg = []
+pos = []
+for i in fp:
+    train_txt_orig.append(i)
+    pos.append(i)
+for i in fn:
+    train_txt_orig.append(i)    
+    neg.append(i)
+fp.close()
+fn.close()
+
+#分词、去除标点符号
+def cut_txt(txt):
+    txtlist = []
+    dots = ['。','，','！','？','、','：','；','”','“','’','‘','\'','"','（',\
+            '）','——','—','(',')','……','…','@','#','%','&','·','*','=','=',\
+            '-','\\','/','<','>','《','》','[',']','|','|','￥','$','\s+',' ','"']
+    list = jieba.cut(txt)
+    for i in list:
+        if not i in dots:
+            txtlist.append(i)
+    return txtlist
+
+#对分词后的语料进行word-embedding
+#定义训练集
+train_tokens = []
+for i in train_txt_orig:
+    #句子分词去除标点后生成一个列表，形如“['学习','python','使','我','快乐']”
+    senlist = cut_txt(i)
+    cut_list = []
+    for i in senlist:
+        #获取索引并生成list
+        try:
+            i_index = cn_model.vocab[i].index
+        except KeyError:
+            i_index = 0
+        cut_list.append(i_index)
+    train_tokens.append(cut_list)
+
+#生成一个以子list长度为元素的向量
+num_tokens = [len(tokens) for tokens in train_tokens]
+num_tokens = np.array(num_tokens)
+
+#训练语料少，直接将语料中得最长值定义为max_tokens
+max_tokens = np.max(num_tokens)
+
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense,GRU,Embedding,LSTM,Bidirectional
+from tensorflow.python.keras.preprocessing.text import Tokenizer
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.python.keras.optimizers import RMSprop
+from tensorflow.python.keras.optimizers import Adam
+from tensorflow.python.keras.callbacks import EarlyStopping,ModelCheckpoint,TensorBoard,ReduceLROnPlateau
+
+embedding_dim = cn_model['私营企业'].shape[0]
+#预训练的词向量模型共收录了350000+词汇，在这里我么使用其前350000个词
+#训练语料少，尽可能多从cn_model获取信息
+#训练语料与生成cn_model的语料同源，理论上训练语料中的所有词都能在cn_model中找到
+num_words = 350000
+#构造初始化的embedding_matrix备用
+embedding_matrix = np.zeros((num_words,embedding_dim))
+for i in range(num_words):
+    embedding_matrix[i,:] = cn_model[cn_model.index2word[i]]
+#embedding_matrix必须是float32,不然会出错
+embedding_matrix = embedding_matrix.astype('float32')
+
+#max_tokens = 114
+
+#对语料进行裁剪、填充
+train_pad = pad_sequences(train_tokens,maxlen = max_tokens,
+                         padding = 'pre' , truncating = 'pre')
+train_pad[train_pad >= num_words] = 0
+
+#构造训练目标
+a = []
+for i in range(1604):
+    a.append(1)
+for i in range(552):
+    a.append(0)
+a = np.array(a)
+train_target = a
+
+#训练集、测试集分割
+X_train,X_test,y_train,y_test = train_test_split(train_pad,train_target,
+                                                 test_size = 0.1,random_state=5)                                                
+
+#搭建训练模型
+model = Sequential()
+model.add(Embedding(num_words,embedding_dim,weights=[embedding_matrix],
+                    input_length=max_tokens,trainable=False))
+model.add(Bidirectional(LSTM(units=32,return_sequences=True)))
+model.add(LSTM(units=16,return_sequences=False))
+model.add(Dense(1,activation = 'sigmoid'))
+#模型优化
+optimizer = Adam(lr=1e-3)
+model.compile(loss='binary_crossentropy',optimizer=optimizer,metrics=['accuracy'])
+#模型汇总
+model.summary()
+
+path_checkpoint = 'sentiment_checkpoint.keras'
+checkpoint = ModelCheckpoint(filepath = path_checkpoint,monitor='val_loss',
+                            verbose=1,save_weights_only=True,
+                            save_best_only=True)
+try:
+    model.load_weights(path_checkpoint)
+except Exception as e:
+    print(e)
+earlystopping = EarlyStopping(monitor='val_loss',patience=3,verbose=1)
+lr_reduction = ReduceLROnPlateau(monitor='val_loss',factor=0.1,
+                                 min_lr=1e-5,patience=1,verbose=1)
+callbacks = [
+    earlystopping,
+    checkpoint,
+    lr_reduction
+]
+
+
+#开始训练
+model.fit(X_train,y_train,
+         validation_split = 0.1,
+         epochs = 20,
+         batch_size=64,
+         callbacks=callbacks )
+
+result = model.evaluate(X_test,y_test)
+print('Accuracy:{0:.4%}'.format(result[1]))
+
+
+def predict_sentiment(txt):
+    senlist = cut_txt(txt)
+    cut_list = []
+    for i in senlist:
+        try:
+            i_index = cn_model.vocab[i].index
+        except KeyError:
+            i_index = 0
+        cut_list.append(i_index)
+    tokens_pad = pad_sequences([cut_list],maxlen = max_tokens,padding='pre',truncating='pre')
+    
+    result = model.predict(x=tokens_pad)
+    coef = result[0][0]
+    return coef
+
+
+f = open('d:/target.txt','r',encoding = 'utf-8')
+content = []
+for i in f:
+    content.append(i)
+f.close
+print(len(content))
+
+#创建list of search_keywords
+j9 = ['新社会阶层' , '中介组织从业人员' , '新媒体从业人员' , '自由职业人员']
+j1 = ['个体户' , '个体工商户' , '个体小商贩' , '个体手工业' , '个体经营' , '个体业户' , '私营业户' ,'公司老板' , '商店老板' , '私企老板' , '私营企业主' , '小企业主']
+j2 = ['私企' , '私营' , '外企' , '外资企业' , '外商投资企业' , '私营工业' , '“三资”企业' , '个体经济' , '私营经济']
+j21 = ['技术人员' , '管理人员' , '管理技术人员' , '技术员' , '白领' , '管理员']
+j3 = ['中介企业' , '中介服务' , '中介公司' , '中介机构' , '中介组织' , '会计事务所' , '律师事务所' , '职业中介所' , '职业介绍所' , '职业介绍机构' ]
+j31 = ['工作人员' , '职员' , '员工' , '白领' , '管理人员' , '领导' , '技术员' , '技术人员' , '业务人员' , '业务员' , '管理员' ]
+
+
+xuhao = 1
+for l in content[24351:]:     #24351
+#print(l)【版面】第.+版
+    print(str(xuhao))
+    xuhao += 1
+    
+    l = str(l)
+    date = str(re.findall(r'【日期】(.+)【版次】' , l))
+    date = re.sub("[\[\]' ]+",'',date)
+    title = str(re.findall(r'【标题】(.+)【正文】', l))
+    title = re.sub("[\[\]']+",'',title)
+    edit = str(re.findall(r'【版次】(.+)【标题】', l))
+    edit = re.sub("[\[\]']+",'',edit)
+    body = str(re.findall(r'【正文】(.+)', l))
+    body = re.sub("[\[\]' ]+",'', body)
+    lenth = len(body)
+    #print(body)
+
+    #存在一些报道通篇没有。(如名单通报)，在此去除
+    if '。'  in  body:
+        print(date+title) 
+        
+        tit_sentiment = predict_sentiment(title)
+        print('标题情感倾向值：' + str(tit_sentiment))      
+
+        #判断报道正文、关键词列表里是否包含search_keywords
+        #定义相关变量初始值
+        men_nc = 0
+        k_nc = 0
+        men_geti = 0
+        k_geti = 0
+        men_siqi = 0
+        k_siqi = 0
+        men_sqgj = 0
+        k_sqgj = 0
+        men_zj = 0
+        k_zj = 0
+        men_zjry = 0
+        k_zjry = 0
+
+        #######################################################
+        #判断报道正文是否包含search_keywords
+        #tw = target words
+        tw=[]
+        for i9 in j9:
+            if i9 in l:
+                men_nc = 1
+                tw.append(i9)
+        for i1 in j1:
+            if i1 in l:
+                men_geti = 1
+                tw.append(i1)
+        for i2 in j2:
+            if i2 in l :
+                tw.append(i2)
+                for i21 in j21:
+                    if i21 in l:
+                        tw.append(i21)
+                        men_sqgj = 1    
+                    else:
+                        men_siqi = 1
+        for i3 in j3:
+            if i3 in l:
+                tw.append(i3)
+                for i31 in j31:
+                    if i31 in l:
+                        tw.append(i31)
+                        men_zjry = 1
+                    else:
+                        men_zj = 1    
+
+        #定义一个空列表来装每一句话的情感倾向值
+        sen = []
+        #抽取每次提及search_keywords时的上一句、提及句及下一句，并计算情感倾向值
+        for i in range(len(tw)):
+            target_word = tw[i]
+            #pbsen = prefer-behind sentence
+            pbs ='([^。^\？^！^……]*[。\？！……]*)([^。^\？^!^……]*?' + target_word + '.*?[。|\？|！|……])([^。^\？^！^……]*[。|\？|！|……]{0,1})'
+            #print(pbs)
+            pbsen = re.findall(pbs,body)
+            #print(pbsen)
+            for n in range(len(pbsen)):
+                for i in pbsen[n]:
+                    #print(i)
+                    if len(i) >= 15:
+                        sentiment = predict_sentiment(i)
+                        #print(sentiment)
+                        sen.append(sentiment)
+        np.array(sen)
+        txt_senti = np.mean(sen)
+        #print(txt_senti)    
+
+
+        ##############################################
+        #判断报道关键词列表里是否包含search_keywords
+        a = ['新社会阶层' , '中介组织从业人员' , '新媒体从业人员' , '自由职业人员' , '个体户' , '个体工商户' , \
+         '个体小商贩' , '个体手工业' , '个体经营' , '个体业户' , '私营业户' ,'公司老板' , '商店老板' , '私企老板' , \
+         '私营企业主' , '小企业主' , '私企' , '私营' , '外企' , '外资企业' , '外商投资企业' , '私营工业' , '“三资”企业' , \
+         '个体经济' , '私营经济' , '技术人员' , '管理人员' , '管理技术人员' , '技术员' , '白领' , '管理员' , '中介企业' , \
+         '中介服务' , '中介公司' , '中介机构' , '中介组织' , '会计事务所' , '律师事务所' , '职业中介所' , '职业介绍所' , \
+         '职业介绍机构' , '工作人员' , '职员' , '员工' , '白领' , '管理人员' , '领导' , '技术员' , '技术人员' , '业务人员' , '业务员' , '管理员']
+        for i in a:
+            jieba.add_word( i ,freq = None, tag = 'n')
+
+        kw = jieba.analyse.extract_tags(l, topK=10, withWeight=False, allowPOS=())
+        print(str(kw))
+        for i9 in j9:
+            if i9 in kw:
+                k_nc = 1
+        for i1 in j1:
+            if i1 in kw:
+                k_geti = 1
+        for i in j2:
+            if i in l :
+                for i2 in j21:
+                    if i2 in kw:
+                        k_sqgj = 1    
+                    else:
+                        k_siqi = 1
+        for i in j3:
+            if i in l:
+                for i2 in j31:
+                    if i2 in kw:
+                        k_zjry = 1
+                    else:
+                        k_zj = 1
+
+        j = men_nc + men_geti + men_siqi + men_sqgj + men_zj + men_zjry
+        if j > 0:
+        
+        
+        #tj.append(j)
+            #提及词类型
+            mention = str(men_nc) + ',' + str(men_geti) + ',' + str(men_siqi) + ',' + str(men_sqgj) + ',' + str(men_zj) + ',' + str(men_zjry)
+            #前3个提及词
+            men_sear = str(tw[:2])
+            men_sear  = re.sub('\', \'','、',men_sear )
+            men_sear  = re.sub(']','',men_sear )
+            men_sear  = re.sub('\[','',men_sear )
+            #核心词类型
+            key_men = str(k_nc) + ',' + str(k_geti) + ',' + str(k_siqi) + ',' + str(k_sqgj) + ',' + str(k_zj) + ',' + str(k_zjry)
+            #前十个核心词
+            key_word = kw[0] + ',' + kw[1] + ',' + kw[2]+ ',' + kw[3]+ ',' + kw[4]+ ',' + kw[5] + ',' + kw[6]+ ',' + kw[7]+ ',' + kw[8]+ ',' + kw[9]
+
+            table = open('d:/data0728.csv' , 'a' , encoding = 'utf-8')
+            table.write(date[:4] + ','+ date[5:7] + ','+ date[-2:] + ',' + title + ','+ str(tit_sentiment) + ',' + edit + ',' + str(lenth) 
+                  + ',' + men_sear + ',' + str(len(tw)) + ',' + mention  +',' + key_men + ','+ key_word + ',' + str(txt_senti) + '\n')
+            table.close()
+            print(date[:4] + ','+ date[5:7] + ','+ date[-2:] + ',' + title + ','+ str(tit_sentiment) + ',' + edit + ',' + str(lenth) 
+                  + ',' + men_sear + ',' + str(len(tw)) + ',' + mention  +',' + key_men + ','+ key_word + ',' + str(txt_senti) + '\n')
+    else:
+        pass
+    #print(dict(Counter(tj)))
+    
+    
+    #去除重复测试
+content = [] 
+list1 = []
+with open("D:/3%sample.txt", 'r',encoding = 'utf-8') as f:
+    for line in f.readlines():
+        list1.append([line.strip('\n')])
+print(len(list1))
+
+for i in list1:
+    if not i in content:
+        content.append(i)
+print(len(content))
+
+f = open('d:/samplesentiment.csv','a' , encoding = 'utf-8')
+for l in content:     
+#print(l)【版面】第.+版
+    l = str(l)
+    l = re.sub("[\[\]' \"]+",'',l)
+    year = l[:4]
+    month = l[5:7]
+    sen = str(re.findall(r'句子:(.*)',l))
+    sen = re.sub("[\[\]']+",'',sen)
+    
+    sentiment = predict_sentiment(sen)
+
+    f.write(year + ',' + month + ',' + str(sentiment) + '\n')
+    
+f.close()
