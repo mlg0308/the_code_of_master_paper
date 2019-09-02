@@ -1,0 +1,204 @@
+import re
+import jieba.posseg as pseg
+import pandas as pd 
+from collections import Counter
+
+stopwords = []
+with open("D:/stopwords.txt", 'r' , encoding = 'utf-8') as f:
+        for line in f.readlines():
+            stopwords.append(line.strip('\n'))
+
+f = open('d:/target.txt','r',encoding = 'utf-8')
+content = []
+for i in f:
+    content.append(i)
+f.close
+
+j9 = ['新社会阶层' , '中介组织从业人员' , '新媒体从业人员' , '自由职业人员']
+j1 = ['个体户' , '个体工商户' , '个体小商贩' , '个体手工业' , '个体经营' , '个体业户' , '私营业户' ,'公司老板' , '商店老板' , '私企老板' , '私营企业主' , '小企业主']
+j2 = ['私企' , '私营' , '外企' , '外资企业' , '外商投资企业' , '私营工业' , '“三资”企业' , '个体经济' , '私营经济']
+j21 = ['技术人员' , '管理人员' , '管理技术人员' , '技术员' , '白领' , '管理员']
+j3 = ['中介企业' , '中介服务' , '中介公司' , '中介机构' , '中介组织' , '会计事务所' , '律师事务所' , '职业中介所' , '职业介绍所' , '职业介绍机构' ]
+j31 = ['工作人员' , '职员' , '员工' , '白领' , '管理人员' , '领导' , '技术员' , '技术人员' , '业务人员' , '业务员' , '管理员' ]
+
+# search = j9 + j1 + j2 + j21 + j3 + j31
+
+all_a = []
+all_v = []
+all_n = []
+
+for l in content:     #24351
+#print(l)【版面】第.+版
+    l = str(l)
+    date = str(re.findall(r'【日期】(.+)【版次】',l))
+    date = re.sub("[\[\]' ]+",'',date)
+    title = str(re.findall(r'【标题】(.+)【正文】',l))
+    title = re.sub("[\[\]']+",'',title)
+    edit = str(re.findall(r'【版次】(.+)【标题】',l))
+    edit = re.sub("[\[\]']+",'',edit)
+    body = str(re.findall(r'【正文】(.*)',l))
+    body = re.sub("[\[\]']+",'',body)
+    lenth = len(body)
+    year = date[:4]
+    year = int(year)
+    
+    #存在一些报道通篇没有。(如名单通报)，在此去除
+    if '。'  in  body:
+        #print(year)
+        if (1978 <= year <= 1992):
+            for i in search:
+                rgex ='[^。^\？^!^……]*?' + i + '.*?[。|\？|！|……]'
+                #print(pbs)
+                senlist = re.findall(rgex,body)
+                #print(pbsen)
+                for sentence in senlist:
+                    data = pseg.cut(sentence)
+                    df = pd.DataFrame(data,columns=['i.word','i.flag'])
+                    df=df[~df['i.word'].isin(stopwords)]
+                    a = list(df.loc[(df[df['i.flag'].isin(['a'])].index) , 'i.word'])
+                    v = list(df.loc[(df[df['i.flag'].isin(['v'])].index) , 'i.word'])
+                    n = list(df.loc[(df[df['i.flag'].isin(['n'])].index) , 'i.word'])
+                    all_a = all_a + a
+                    all_v = all_v + v
+                    all_n = all_n + n
+        else:
+            pass
+    else:
+        pass
+print('a: ' + str(len(all_a)))
+print('v: ' + str(len(all_v)))
+print('n: ' + str(len(all_n)))
+
+word_counts_a = collections.Counter(all_a)
+word_counts_v = collections.Counter(all_v)
+word_counts_n = collections.Counter(all_n)
+
+f = open("D:/词频统计1978a.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_a.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+f = open("D:/词频统计1978v.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_v.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+f = open("D:/词频统计1978n.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_n.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+all_a = []
+all_v = []
+all_n = []
+
+for l in content:     #24351
+#print(l)【版面】第.+版
+    l = str(l)
+    date = str(re.findall(r'【日期】(.+)【版次】',l))
+    date = re.sub("[\[\]' ]+",'',date)
+    title = str(re.findall(r'【标题】(.+)【正文】',l))
+    title = re.sub("[\[\]']+",'',title)
+    edit = str(re.findall(r'【版次】(.+)【标题】',l))
+    edit = re.sub("[\[\]']+",'',edit)
+    body = str(re.findall(r'【正文】(.*)',l))
+    body = re.sub("[\[\]']+",'',body)
+    lenth = len(body)
+    year = date[:4]
+    year = int(year)
+    
+    #存在一些报道通篇没有。(如名单通报)，在此去除
+    if '。'  in  body:
+        #print(year)
+        if (1992 < year <= 2001):
+            for i in search:
+                rgex ='[^。^\？^!^……]*?' + i + '.*?[。|\？|！|……]'
+                #print(pbs)
+                senlist = re.findall(rgex,body)
+                #print(pbsen)
+                for sentence in senlist:
+                    data = pseg.cut(sentence)
+                    df = pd.DataFrame(data,columns=['i.word','i.flag'])
+                    df=df[~df['i.word'].isin(stopwords)]
+                    a = list(df.loc[(df[df['i.flag'].isin(['a'])].index) , 'i.word'])
+                    v = list(df.loc[(df[df['i.flag'].isin(['v'])].index) , 'i.word'])
+                    n = list(df.loc[(df[df['i.flag'].isin(['n'])].index) , 'i.word'])
+                    all_a = all_a + a
+                    all_v = all_v + v
+                    all_n = all_n + n
+        else:
+            pass
+    else:
+        pass
+print('a: ' + str(len(all_a)))
+print('v: ' + str(len(all_v)))
+print('n: ' + str(len(all_n)))
+
+word_counts_a = collections.Counter(all_a)
+word_counts_v = collections.Counter(all_v)
+word_counts_n = collections.Counter(all_n)
+
+f = open("D:/词频统计1993a.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_a.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+f = open("D:/词频统计1993v.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_v.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+f = open("D:/词频统计1993n.csv", 'a' ,encoding = "gbk")
+f.write("词语" + "," + "词频" + "\n")
+for k, v in word_counts_n.items():
+    f.write(k + "," + str(v) + "\n")
+f.close()
+
+from scipy.misc import imread  # 这是一个处理图像的函数
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+import matplotlib.pyplot as plt
+
+back_color = imread('d:/wordcloud/黑白中国.png')  # 解析该图片     此处是想要作为背景轮廓的图片，图片最好是黑白分明的那种
+
+wc = WordCloud(background_color='white',  # 背景颜色
+               max_words=800,  # 最大词数
+               mask=back_color,  # 以该参数值作图绘制词云，这个参数不为空时，width和height会被忽略
+               max_font_size=150,  # 显示字体的最大值
+               font_path="C:/Windows/Fonts/simhei.ttf",  # 解决显示口字型乱码问题，可进入C:/Windows/Fonts/目录更换字体
+               stopwords=STOPWORDS.update(['版次','实行','需要','提高','组织','应当','说', '实行',
+                                           '新', '坚持','建立','提供','增加','达', '增长','参加',
+                                           '包括','不能','成为','成立','办', '应当']),   #使用默认停用词并且添加括号里的词作为停用词
+               #random_state=2,  # 为每个词返回一个PIL颜色
+               width=4368,  # 图片的宽
+               height=3375,  #图片的长
+               collocations = False,
+               contour_width= 1, 
+               contour_color='black'
+               )
+# WordCloud各含义参数请点击 wordcloud参数
+
+#输入的是一个词列表，如下：
+#all_a = ['改革','开放','以来','中国','取得','','','','','','','','','','']
+
+
+text = ' '.join(all_a)
+    
+    
+wc.generate(text)
+# 基于彩色图像生成相应彩色
+image_colors = ImageColorGenerator(back_color)
+# 显示图片
+plt.imshow(wc)
+# 关闭坐标轴
+plt.axis('off')
+# 绘制词云
+plt.figure()
+plt.imshow(wc.recolor(color_func=image_colors))
+plt.axis('off')
+# 保存图片
+wc.to_file('d:/wordcloud/2018a.png')
