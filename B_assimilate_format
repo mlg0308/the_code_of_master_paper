@@ -1,0 +1,113 @@
+import re
+
+f = open('d:/txtdata/1985.txt','r',encoding='gbk')
+f1 = open('d:/1985.txt','a',encoding='gbk')
+for line in f:
+    line = line.replace('\n','')
+    line = line.replace('\r','')
+    line = line.replace('\t','')
+    line = line.replace('\v','')
+    line = line.replace('【日期】','\n'+'【日期】')
+    f1.write(line)
+
+f.close()
+f1.close()
+
+########################################################################################
+#去除爬取数据中的图片网址、段落符号等内容，并将04年及以后的数据格式与之前的数据格式统一
+########################################################################################
+for i in list(range(2004,2019)):
+    old = ("D:/" + str(i) + ".txt")
+    new = ("D:/txtdata/" + 'n'+ str(i) + ".txt")
+    # 打开旧文件
+    f = open(old,'r',encoding='utf-8')
+
+    # 打开新文件
+    f_new = open(new,'w',encoding='utf-8')
+    f3 = open("D:/zha.txt",'a',encoding='utf-8')
+
+    # 循环读取旧文件
+    for line in f:
+        # 进行判断
+        if "vpn.ruc.edu.cn" or "192.168.30.70:957" in line:
+        #lines = (re.findall(r'<div align=.{40,160}class="pic">',line))
+        #while lines is not None:
+        #    print(str(lines))
+        #    line = line.replace(lines , '')
+            zha = str(re.findall(r'<div align=.{40,160}class="pic">', line)) 
+            f3.write(str(zha))
+            zha = str(re.findall(r'<div align=.{40,160}class="pic">', line))   
+            f3.write(str(zha))
+            zha = str(re.findall(r'<div align=.{40,160}class="pic">', line))   
+            f3.write(str(zha))
+            zha = str(re.findall(r'<div align=.{40,160}class="pic">', line))   
+            f3.write(str(zha))
+            line = str(re.subn(r'<div align=.{40,160}class="pic">','', line, flags = re.I))   
+            line = str(re.subn(r'<div align=.{1,160}JPEG"/></div><br/><p>','', line, flags = re.I)) 
+            line = str(re.subn(r'<div align=.{1,160}JPEG"/>','', line, flags = re.I)) 
+            line = str(re.subn(r'<div align=.{1,180}</div>','', line, flags = re.I))
+            
+        else:
+            line = line.replace('\n','')
+
+        htmlcode = ['n"','0)','1)','2)','3)','[\' ','\']','[]','\'','"','\\',',','[','n','(','xa0','u3000','<br/>','</p>','<p>','‖',
+                    '</td>','</tr>','</table>','</div>','<b>','<font color="000000">','</font>','</b>',
+                    '<font size="-1">','</font>','ufeff','<table border=0 width=550><tr><td alig=ceter class=pic>']
+        for i in htmlcode:
+            line = line.replace( i ,'')
+            f3.write(i)
+        f_new.write(str(line) + '\n' )
+
+    f3.close()
+    f.close()
+    f_new.close()
+    
+
+#1978\1985\1997数据排版处理
+#f = open('d:/txtdata/1978.txt','r',encoding='gbk')
+#f1 = open('d:/1978.txt','a',encoding='gbk')
+#for line in f:
+#    line = line.replace('\n','')
+#    line = line.replace('\r','')
+#    line = line.replace('\t','')
+#    line = line.replace('\v','')
+#    line = line.replace('【日期】','\n'+'【日期】')
+#    f1.write(line)
+#
+#f.close()
+#f1.close()
+
+for i in list(range(1978,2004)):
+    old = ("D:/txtdata/" + str(i) + ".txt")
+    new = ("D:/txtdata/" + 'n' + str(i) + ".txt")
+    # 打开旧文件
+    f = open(old,'r',encoding='gbk')
+
+    # 打开新文件
+    f_new = open(new,'w',encoding='utf-8')
+    f3 = open("D:/zha.txt",'a',encoding='utf-8')
+
+    # 循环读取旧文件
+    for line in f:
+        zha = str(re.findall(r'(‖)【版面】(第)', line)) 
+        f3.write(zha)
+        line = str(re.subn(r'‖【版面】第','【版次】', line, flags = re.I))
+        a=str(re.findall(r'【版次】([0-9]{2})版.+‖【标题】',line))
+        zha = str(re.findall(r'【版次】[0-9]{2}(版.+‖)【标题】',line))
+        f3.write(zha)
+        b = a+'【标题】'
+        line = str(re.subn(r'([0-9]{2})版.+‖【标题】',b, line, flags = re.I))
+        line = line.replace('\n','')
+        
+        htmlcode = ['n"','0)','1)','2)','3)','[\' ','\']','[]','\'','"','\\',',','[','n','(','xa0','u3000','<br/>','</p>','<p>','‖',
+                    '</td></tr></table></div>','<b><font color="000000">','</font></b>',
+                    '</div>','<font size="-1">','</font>','ufeff','<table border=0 width=550><tr><td alig=ceter class=pic>']
+        for i in htmlcode:
+            line = line.replace( i ,'')
+            f3.write(i)
+        f_new.write(str(line) + '\n' )
+
+    f3.close()
+    f.close()
+    f_new.close()
+    #data2004 = pd.read_csv("D:/txtdata/2004.txt",encoding = 'utf-8',sep="','",names=["date","edit","title","body"],error_bad_lines=False)
