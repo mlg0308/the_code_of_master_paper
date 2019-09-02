@@ -1,0 +1,107 @@
+from collections import Counter
+############################################
+#     目标文本筛选
+############################################
+
+#生成文件路径
+for i in range(1978,2019):
+    path = ("D:/txtdata/n" + str(i) + ".txt")
+    print(path)
+
+    #将每年的报道都转换成一个list
+    blist = [] 
+    with open( path , 'r' , encoding = 'utf-8') as f:
+        for line in f.readlines():
+            blist.append([line.strip('\n')])
+    print(len(blist))
+
+    #去除重复的文章
+    content = []
+    for i in blist:
+        if i not in content:
+            content.append(i)
+    print(len(content))
+
+    #创建list of search_keywords
+    j9 = ['新社会阶层' , '中介组织从业人员' , '新媒体从业人员' , '自由职业人员']
+    j1 = ['个体户' , '个体工商户' , '个体小商贩' , '个体手工业' , '个体经营' , '个体业户' , '私营业户' ,'公司老板' , '商店老板' , '私企老板' , '私营企业主' , '企业主']
+    j2 = ['私企' , '私营' , '外企' , '外资企业' , '外商投资企业' , '私营工业' , '“三资”企业' , '个体经济' , '私营经济']
+    j21 = ['技术人员' , '管理人员' , '管理技术人员' , '技术员' , '白领' , '管理员']
+    j3 = ['中介企业' , '中介服务' , '中介公司' , '中介机构' , '中介组织' , '会计事务所' , '律师事务所' , '职业中介所' , '职业介绍所' , '职业介绍机构' ]
+    j31 = ['工作人员' , '职员' , '员工' , '白领' , '管理人员' , '领导' , '技术员' , '技术人员' , '业务人员' , '业务员' , '管理员' ]
+
+    t9 = [ ]
+    t1 = [ ]
+    t2 = [ ]
+    t21 = [ ]
+    t3 = [ ]
+    t31 = [ ]
+    #构建一个列表来装文章里出现的search_keywords
+    #tw = []
+    for l in content:
+        #print(l)【版面】第.+版
+        l = str(l)
+        #date = str(re.findall(r'【日期】(.+)‖【版面】',l))
+        #title = str(re.findall(r'【标题】(.+)‖【正文】',l))
+        #edit = str(re.findall(r'【版面】第(.{1,2})版',l))
+        #l = str(re.findall(r'【正文】(.*)',l))
+        #l = l.replace('‖','')
+        #l = l.replace('[\'','')
+        #l = l.replace('\u3000','')
+        #l = l.replace('\']','')
+
+        #print(l)
+        m9 = 0
+        m1 = 0
+        m2 = 0
+        m21 = 0
+        m3 = 0
+        m31 = 0
+        for i9 in j9:
+            if i9 in l:
+                m9 = 1
+                #tw.append(i9)
+        for i1 in j1:
+            if i1 in l:
+                m1 = 1
+                #tw.append(i1)
+        for i in j2:
+            if i in l :
+                #tw.append(i)
+                for i2 in j21:
+                    if i2 in l:
+                        #tw.append(i2)
+                        m2 = 1    
+                    else:
+                        m21 = 1
+        for i in j3:
+            if i in l:
+                #tw.append(i)
+                for i2 in j31:
+                    if i2 in l:
+                        #tw.append(i2)
+                        m3 = 1
+                    else:
+                        m31 = 1
+        t9.append(m9)
+        t1.append(m1)
+        t2.append(m2)
+        t21.append(m21)
+        t3.append(m3)
+        t31.append(m31)
+        j = m9 + m1 + m2 + m21 + m3 + m31
+        if j < 1 :
+            pass
+        else:
+            #print(str(date)+str(edit)+ str(title)+str(m9)+ str(m1)+ str(m2)+ str(m21)+ str(m3)+ str(m31))  
+            #seg_list = jieba.cut(l)
+                #f_j.write(line + '\n' + '\n')
+            f =  open("d:/target.txt" , "a" , encoding = 'utf-8')
+            f.write(l + '\n')
+            f.close()
+    print(dict(Counter(t9)))
+    print(dict(Counter(t1)))
+    print(dict(Counter(t2)))
+    print(dict(Counter(t21)))
+    print(dict(Counter(t3)))
+    print(dict(Counter(t31)))
