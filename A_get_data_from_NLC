@@ -1,0 +1,99 @@
+import requests
+from requests.exceptions import RequestException
+from bs4 import BeautifulSoup
+import re
+from urllib import parse
+import pandas as pd
+import time
+import random
+import csv
+import datetime
+from urllib import request
+from http import cookiejar
+import sys
+import io
+
+#构造爬取日期
+#构造爬取日期列表
+def datelist(start, end):
+    start_date = datetime.date(*start)
+    end_date = datetime.date(*end)
+    result = []    
+    curr_date = start_date
+    while curr_date != end_date:
+        result.append("%04d%02d%02d" % (curr_date.year, curr_date.month, curr_date.day))
+        curr_date += datetime.timedelta(1)
+    result.append("%04d%02d%02d" % (curr_date.year, curr_date.month, curr_date.day))
+    return result
+datelist = datelist((2005, 1, 1), (2018, 10, 31))
+#构造版次页网址
+url_onelist = []
+for date in datelist:
+    for edit in list(range(1,25)):
+        url_one = r'http://192.168.30.70:957/search?channelid=10100&searchword=%C8%D5%C6%DA%3d' + date + r'%20and%20%B0%E6%B4%CE%3d'+ str(edit)
+        url_onelist.append(url_one) 
+#       # url_onelist.append('"' + url_one + '"') 
+#print(url_onelist[:3])
+
+#保存版面网址列表，方便断点衔接
+#f = open("d:/date2005-2018nlc.csv","a")
+#n = 0
+#for i in url_onelist:
+#    row = str(n) + '. ' + str(i) + '\n'
+#    f.write(row)
+#    n += 1
+#f.close()
+
+for i in (url_onelist[103492:105192]):  
+    print(i)
+    headers = {
+        'Host': '192.168.30.70:957',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': i ,
+        'Connection': 'keep-alive'
+                   }
+    try:
+        html = requests.get(i, headers = headers) #requests.get()只接受str型网址！！！
+        page = str(BeautifulSoup(html.content,'lxml'))
+        #print(page)
+        h = re.findall(r'href="(http://[^\s]+)"',page)  #匹配并返回网页中的网址
+        #print(h)
+        for url in (h[1:]):
+            #url_two.append(url)
+            #print(url)
+            url = str(url)
+            url = url.replace("amp;","")  #爬取的网址会比实际点击获取的网址在特定位置多了字符串"amp;"，通过此条命令去除
+            #print(n)
+            try:
+                html = requests.get(url, headers = headers ) #requests.get()只接受str型网址！！！
+                page = str(BeautifulSoup(html.content,'lxml'))
+
+                #数据存储
+                #print(page)
+                txt = re.findall(r'<div class="div_detail-neirong" id="fontzoom">(.+)</div>',page)
+                #print(txt)
+                date = re.findall(r'class="div_detail-cl">【人民日报(.+)第<font',page)
+                #print(date)
+                edit = re.findall(r'color="red">(.+)</font>版<script',page)
+                title = re.findall(r'<div class="div_biaoti">(.+)</div>',page)
+
+                f = open("d:/2016.txt","a" , encoding = 'utf-8')
+                row = '【日期】'+ str(date) + '【版次】' + str(edit) + '【标题】' + str(title) + '【正文】' + str(txt) + '\n'
+                f.write(row)
+                f.close()
+                time.sleep(random.uniform(0.00,1.00))
+            except RequestException as e:
+                f = open("d:/failurl.txt" , "a" )
+                f.write(url + '\n')
+                f.close()
+                print('爬虫错误，错误原因：',str(e))
+    except RequestException as e:
+        f = open("d:/failurl.txt" , "a" )
+        f.write(i + '\n')
+        f.close()
+        print('爬虫错误，错误原因：',str(e))  
+
+    print(str(date) + "第" + str(edit) + "版爬取完毕")
