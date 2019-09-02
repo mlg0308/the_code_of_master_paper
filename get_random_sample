@@ -1,0 +1,33 @@
+import re 
+import random
+
+for i in list(range(1978,2019)):
+    path = ("D:/txtdata/n" + str(i) + ".txt")
+    content = [] 
+    with open( path , 'r',encoding = 'utf-8') as f:
+        for line in f.readlines():
+            content.append([line.strip('\n')])
+    
+    for i in list(range(0,1500)):
+        case = str(random.choice(content))
+        date = str(re.findall(r'【日期】(.+)【版次】',case))
+        date = re.sub("[\[\]' ]+",'',date)
+        paper = str(re.findall(r'【正文】(.*)',case))
+        if "。" in paper:
+            list_paper = paper.strip().split("。"or "!" or "?" )
+            if len(list_paper) > 3:
+                sentence = str(random.choice(list_paper))
+                if len(sentence) > 20:
+                    sentence = sentence.replace('[','')
+                    sentence = sentence.replace('"','')
+                    sentence = sentence.replace(']','')
+                    f = open("d:/sample.txt" , 'a' , encoding = 'utf-8')
+                    f.write(date + '句子:' + sentence + '\n')
+                    f.close()
+                    #print(date + '句子:' + sentence + '\n')
+                else:
+                    pass
+            else:
+                pass
+        else:
+            pass
